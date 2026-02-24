@@ -1,0 +1,38 @@
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Space+Mono:wght@400;700&family=Syne:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Instrument Serif", serif;
+  --font-sans: "Syne", sans-serif;
+  --font-mono: "Space Mono", monospace;
+
+  --color-oracle-gold: #C3A634;
+  --color-oracle-amber: #F7931A;
+  --color-oracle-dark: #0A0A0A;
+}
+
+@layer base {
+  body {
+    @apply bg-oracle-dark text-white font-sans antialiased selection:bg-oracle-gold/30;
+  }
+
+  input:focus {
+    @apply outline-none;
+  }
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@keyframes drift {
+  0% { transform: translate(0, 0); }
+  50% { transform: translate(10px, -10px); }
+  100% { transform: translate(0, 0); }
+}
+
+.animate-drift {
+  animation: drift 8s ease-in-out infinite;
+}
