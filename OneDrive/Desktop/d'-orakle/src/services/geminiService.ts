@@ -108,3 +108,80 @@ Output Requirements:
     throw new Error("The orakle spoke in riddles. Please try again.");
   }
 }
+
+export async function streamOracleReading(
+  words: string[],
+  onText: (partial: string) => void
+): Promise<OracleResult> {
+  const [word1, word2, word3] = words;
+  const models = [
+    process.env.GEMINI_MODEL || "gemini-flash-latest",
+    "gemini-2.5-flash",
+    "gemini-pro-latest",
+    "gemini-2.5-pro",
+  ];
+  const model = models[0];
+
+  const prompt = `You are a deeply intuitive, poetic crypto personality orakle.
+You are direct, evocative, and occasionally unsettling in your accuracy.
+
+A person described themselves with exactly three words:
+"${word1}", "${word2}", "${word3}".
+
+Strictly output JSON matching:
+{
+  "is_valid": boolean,
+  "error_message": string,
+  "coin": string,
+  "ticker": string,
+  "verdict": string,
+  "traits": string[],
+  "uncomfortable_truth": string
+}
+Never include any extra commentary outside JSON.`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "x-goog-api-key": process.env.GEMINI_API_KEY || "",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+    }),
+  });
+
+  if (!res.body) {
+    throw new Error("The orakle is unreachable. Please try again.");
+  }
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const chunk = decoder.decode(value, { stream: true });
+    buffer += chunk;
+    const texts = Array.from(chunk.matchAll(/"text"\s*:\s*"([^"]*)"/g)).map(m =>
+      m[1].replace(/\\"/g, '"')
+    );
+    if (texts.length) {
+      const partial = texts.join("");
+      onText(partial);
+    }
+  }
+
+  const finalTextMatches = Array.from(buffer.matchAll(/"text"\s*:\s*"([^"]*)"/g)).map(m =>
+    m[1].replace(/\\"/g, '"')
+  );
+  const finalText = finalTextMatches.join("");
+
+  try {
+    return JSON.parse(finalText.trim());
+  } catch {
+    throw new Error("The orakle spoke in riddles. Please try again.");
+  }
+}

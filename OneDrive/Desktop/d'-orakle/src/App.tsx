@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Sparkles, Share2, Copy, RefreshCw, Loader2, Info } from 'lucide-react';
-import { getOracleReading } from './services/geminiService';
+import { getOracleReading, streamOracleReading } from './services/geminiService';
 import { OracleResult, COIN_THEMES, DEFAULT_THEME } from './types';
 
 function Typewriter({ text, delay = 50 }: { text: string; delay?: number }) {
@@ -32,6 +32,7 @@ export default function App() {
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [copied, setCopied] = useState(false);
   const hasGeminiKey = Boolean(process.env.GEMINI_API_KEY);
+  const [partial, setPartial] = useState('');
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -95,9 +96,22 @@ export default function App() {
     
     setScreen('loading');
     setError(null);
+    setPartial('');
 
     try {
-      const data = await getOracleReading(words);
+      const MAX_MS = 10000;
+      const final = new Promise<OracleResult>(async (resolve, reject) => {
+        try {
+          const res = await streamOracleReading(words, (t) => setPartial(t));
+          resolve(res);
+        } catch (e) {
+          reject(e);
+        }
+      });
+      const timeout = new Promise<OracleResult>((_, reject) =>
+        setTimeout(() => reject(new Error("The orakle took too long. Please try again.")), MAX_MS)
+      );
+      const data = await Promise.race([final, timeout]);
       if (!data.is_valid) {
         setError(data.error_message || "The orakle only reads the soul. Please provide words that describe your inner self.");
         setScreen('error');
@@ -380,6 +394,16 @@ export default function App() {
                     </motion.p>
                   </AnimatePresence>
                 </div>
+                {partial && (
+                  <motion.pre 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-4 text-xs font-mono text-white/60 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 whitespace-pre-wrap break-words"
+                    style={{ maxHeight: '12rem', overflow: 'auto' }}
+                  >
+                    {partial}
+                  </motion.pre>
+                )}
               </div>
             </motion.div>
           )}
